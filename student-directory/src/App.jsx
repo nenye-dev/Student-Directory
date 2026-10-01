@@ -1,8 +1,12 @@
-import { useState, useEffect} from 'react'
-import {LoaderCircle,WifiOff,CircleX,Search}from 'lucide-react';
+import { useState, useEffect } from 'react'
 import Header from './components/header.jsx'
 import Body1 from './components/Body1.jsx'
-import StudentsCard from './components/StudentsCard.jsx'
+import LoadingPage from './components/LoadingPage.jsx'
+import OfflinePage from './components/OfflinePage.jsx'
+import ErrorPage from './components/ErrorPage.jsx'
+import StudentNotFound from './components/StudentNotFound.jsx'
+import StudentsList from './components/StudentsList.jsx'
+import useStudentsData from './hooks/useStudentsData.js'
 import './App.css'
 
 
@@ -10,158 +14,55 @@ import './App.css'
 
 
 function App() {
-            const [students,setStudents]=useState([]);
-            const[isLoading,setIsLoading]=useState(true);
-            const[error,setError]=useState(false);
-            const[searchText,setSearchText]=useState(localStorage.getItem('searchText')||'');
-            const[selectedCity,setSelectedCity]=useState(localStorage.getItem('selectedCity')||'All Cities');
-            const[isOnline,setIsOnline]=useState(navigator.onLine);
-            useEffect(()=>{
-                localStorage.setItem('searchText',searchText);
-            },[searchText]);
-            useEffect(()=>{
-                localStorage.setItem('selectedCity',selectedCity);
-            },[selectedCity]);
-            
-            useEffect(()=>{
-                fetch('https://dummyjson.com/users')
-                .then((response)=>{
-                    return response.json();
-                })
-                .then((data)=>{
-                    console.log(data)
-                    setStudents(data.users);
-                    setTimeout(()=>{
-                        setIsLoading(false);
-                    },1500);
-                    
-                })
-                .catch(()=>{
-                    if(navigator.onLine){
-                        setError(true);
-                    }
-                    
-                    setIsLoading(false);
-                });
-            }, [])
-            useEffect(()=>{
-                const handleOnline=()=>{
-                    setIsOnline(true);
-                    setError(false);
-                    setIsLoading(false);
-                     fetch('https://dummyjson.com/users')
-                .then((response)=>{
-                    return response.json();
-                })
-                .then((data)=>{
-                    console.log(data)
-                    setStudents(data.users);
-                    setTimeout(()=>{
-                        setIsLoading(false);
-                    },1500);
-                    
-                })
-                .catch(()=>{
-                    
-                 setError(true);
-                 setIsLoading(false);
-                });
-            
-                };
-                const handleOffline =()=>{
-                    setIsOnline(false);
-                };
-                window.addEventListener('online',handleOnline);
-                window.addEventListener('offline',handleOffline);
+    const { students, isLoading, error, isOnline } = useStudentsData();
+    const [searchText, setSearchText] = useState(localStorage.getItem('searchText') || '');
+    const [selectedCity, setSelectedCity] = useState(localStorage.getItem('selectedCity') || 'All Cities');
 
-                return()=>{
-                    window.removeEventListener('online',handleOnline);
-                    window.removeEventListener('offline',handleOffline)
-                };
+    useEffect(() => {
+        localStorage.setItem('searchText', searchText);
+    }, [searchText]);
 
-            },[])
-            const filteredStudents=students.filter((student)=>{
-                const matchesUsername=student.username
-                        .toLowerCase()
-                        .includes(searchText.toLowerCase());
-                const matchesCity=selectedCity ==='All Cities'||
-                        student.address.city === selectedCity;
-                        return matchesUsername && matchesCity
-                    
-            });
-            const cities=[...new Set (students.map((student)=>{
-                return student.address.city;
-            })
-        )];
-            return(
-                <>
-                <Header />
-                <div className="page">
+    useEffect(() => {
+        localStorage.setItem('selectedCity', selectedCity);
+    }, [selectedCity]);
+
+    const filteredStudents = students.filter((student) => {
+        const matchesUsername = student.username
+            .toLowerCase()
+            .includes(searchText.toLowerCase());
+        const matchesCity = selectedCity === 'All Cities' ||
+            student.address.city === selectedCity;
+        return matchesUsername && matchesCity;
+    });
+
+    const cities = [...new Set(students.map((student) => {
+        return student.address.city;
+    }))];
+    return (
+        <>
+            <Header />
+            <div className="page">
                 <Body1
-                searchText={searchText}
-                setSearchText={setSearchText}
-                cities={cities}
-                selectedCity={selectedCity}
-                setSelectedCity={setSelectedCity}
-                isOnline={isOnline}
-                error={error}
-                 />
-                {isLoading &&
-                    <div className="loading-page">
-                         <LoaderCircle />
-                         <h3 class="loading-state">Loading Students...</h3>
-                         <p>This might take a few seconds</p>
-                    </div>
-                }
-                {!isOnline && (
-                    <div className="internet-loss-page">
-                    <WifiOff />
-                    <p>Connection Lost. <br />
-                    Please check your Internet Connection and Try Again.</p>
-                    </div>
+                    searchText={searchText}
+                    setSearchText={setSearchText}
+                    cities={cities}
+                    selectedCity={selectedCity}
+                    setSelectedCity={setSelectedCity}
+                    isOnline={isOnline}
+                    error={error}
+                />
+                {isLoading && <LoadingPage />}
+                {!isOnline && <OfflinePage />}
+                {error && <ErrorPage />}
+                {isOnline && !isLoading && !error && filteredStudents.length === 0 && (
+                    <StudentNotFound searchText={searchText} />
                 )}
-                    
-                {error && 
-                <div className="error-page">
-                    <CircleX />
-                    <h3>Unable to Load Students.</h3>
-                    <p>Something went wrong while fetching the<br />student directory.</p>
-                </div>
-            }
-                {isOnline &&!isLoading && !error && filteredStudents.length===0 &&(
-                    <div className="user-not-found">
-                        
-                        <Search /> 
-                        <p>Student Not Found...</p>
-                        <p>We couldn't find any student named "{searchText}"</p>
-
-
-                    </div>
+                {isOnline && !isLoading && !error && filteredStudents.length > 0 && (
+                    <StudentsList filteredStudents={filteredStudents} />
                 )}
-                
-                {isOnline &&!isLoading && !error && filteredStudents.length >0 &&(
-                    <>
-                        <p>
-                           {filteredStudents.length} students 
-                        </p>
-                    <div className="students-container">
-                        {filteredStudents.map((student)=>(
-                            <StudentsCard
-                            key={student.id}
-                            name={student.firstName+ ' ' +student.lastName}
-                            image={student.image}
-                            username={student.username}
-                            email={student.email}
-                            city={student.address.city}
-                            />
-                        ))}
-                    </div>
-                </>
-                )}
-                </div>
-                
-                </>
-            );
-        }
+            </div>
+        </>
+    );
+}
 
 export default App
